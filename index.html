@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Socket.IO chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <ul id="messages"></ul>
+    <form id="form" action="">
+        <input id="input" autocomplete="off" /><button>Send</button>
+    </form>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var socket = io();
+        var messages = document.getElementById('messages');
+        var form = document.getElementById('form');
+        var input = document.getElementById('input');
+        var name = prompt("Enter your name")
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition);
+            } else {
+                console.log("no");
+            }
+        }
+
+        function showPosition(position) {
+            console.log('Latitude:', position.coords.latitude);
+            console.log('Longitude:', position.coords.longitude);
+            socket.emit('location',{latitude:position.coords.latitude, longitude:position.coords.longitude, user:name})
+        }
+
+        socket.emit('new user', name)
+        getLocation()
+
+        socket.on('new user', user => {
+            console.log(user);
+            var userEle = document.createElement('h3')
+            userEle.innerHTML = `${user} has joined the chat`
+            userEle.style.textAlign = 'center';
+            messages.appendChild(userEle)
+        })
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (input.value) {
+                socket.emit('chat message', { msg: input.value, name: name });
+                input.value = '';
+            }
+        });
+
+        socket.on('chat message', (msg) => {
+            console.log(msg);
+            var item = document.createElement('li');
+            item.innerHTML = `${msg.name}<br>${msg.msg}`;
+            var msgDiv = document.createElement('div')
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+    </script>
+</body>
+
+</html>
