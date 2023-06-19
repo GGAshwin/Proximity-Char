@@ -5,9 +5,12 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server);
 const User = require('./model')
+const userMap = new Map();
+
+const uniqid = require('uniqid')
 
 const { sin, cos, sqrt, atan2 } = Math;
-const proximityThreshold = 2
+const proximityThreshold = 3
 
 function radians(degrees) {
   return degrees * Math.PI / 180;
@@ -39,7 +42,7 @@ const lat2 = 12.8881078;
 const lon2 = 74.840655;
 
 const distance = calculateDistance(lat1, lon1, lat2, lon2);
-console.log(`The distance between the two locations is ${distance.toFixed(2)} kilometers.`);
+// console.log(`The distance between the two locations is ${distance.toFixed(2)} kilometers.`);
 
 
 const mongoose = require('mongoose');
@@ -82,14 +85,48 @@ io.on('connection', (socket) => {
     const latitude = location.latitude;
     const username = location.user
     try {
-      const user = await User.create({
-        username,
-        latitude,
-        longitude
+      let flag = false
+      const users = await User.find({})
+      console.log(users);
+      users.forEach(async (u) => {
+        if (calculateDistance(latitude, longitude, u.latitude, u.longitude) <= proximityThreshold) {
+          // join that users room then break
+          flag = true
+          socket.join(u.room)
+          let room = u.room
+          userMap.set(socket.id, { room, username });
+          const socketId = socket.id
+          const user = await User.create({
+            username,
+            latitude,
+            longitude,
+            room,
+            socketId
+          })
+          user.save()
+          io.emit('room', room)
+          return
+        }
       })
-      socket.username = username
-      socket.latitude = latitude
-      socket.longitude = longitude
+
+      // if none of the users satisfy the condition then create a new room and save it into db
+      if (!flag) {
+        const room = uniqid()
+        socket.join(room)
+        console.log(room);
+        userMap.set(socket.id, { room, username });
+        const socketId = socket.id
+        const user = await User.create({
+          username,
+          latitude,
+          longitude,
+          room,
+          socketId
+        })
+        user.save()
+        io.emit('room', room)
+      }
+
     } catch (error) {
       const deletUser = await User.findOneAndDelete({ username: username })
       const user = await User.create({
@@ -106,15 +143,25 @@ io.on('connection', (socket) => {
 
   socket.on('new user', (user) => {
     console.log('new user: ' + user)
-    io.emit('new user', user);
+    // io.emit('new user', user);
+    io.to(msg.room).emit('new user', user);
   })
 
   socket.on('chat message', (msg) => {
-    io.emit('chat message', msg);
+    io.to(msg.room).emit('chat message', msg);
+    // io.emit('chat message', msg);
     console.log(msg);
   });
-  socket.on('disconnect', () => {
-
+  socket.on('disconnect',async () => {
+    const user = userMap.get(socket.id);
+    if (user) {
+      console.log(`User '${user.username}' disconnected from room: ${user.room}`);
+      // Perform additional actions with user data as needed
+    }
+    const delUser = await User.deleteMany({ socketId: socket.id })
+    delUser
+    userMap.delete(socket.id);
+    console.log(userMap);
   })
 });
 

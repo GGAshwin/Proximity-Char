@@ -13,6 +13,14 @@ const UserSchema = new mongoose.Schema(
         longitude: {
             type: String,
             required: true
+        },
+        room: {
+            type: String,
+            required: true
+        },
+        socketId: {
+            type: String,
+            required: true
         }
     }
 )

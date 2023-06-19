@@ -43,10 +43,17 @@
             userEle.style.textAlign = 'center';
             messages.appendChild(userEle)
         })
+
+        var roomId = ''
+        socket.on('room',(room)=>{
+            console.log(room);
+            roomId = room
+        })
+
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             if (input.value) {
-                socket.emit('chat message', { msg: input.value, name: name });
+                socket.emit('chat message', { msg: input.value, name: name, room:roomId });
                 input.value = '';
             }
         });
