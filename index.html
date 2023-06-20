@@ -40,8 +40,9 @@
         socket.on('room', (room) => {
             console.log(room);
             roomId = room
-            // socket.emit('new user', { name: name, room: roomId })
+            console.log('called new user here');
         })
+        // socket.emit('new user', { name: name, room: roomId })
 
         socket.on('new user', user => {
             console.log(user);
@@ -50,7 +51,6 @@
             userEle.style.textAlign = 'center';
             messages.appendChild(userEle)
         })
-
 
         form.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -68,6 +68,15 @@
             messages.appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
         });
+
+        socket.on('user left',(user)=>{
+            console.log(`${user} has left`);
+            var userEle = document.createElement('h3')
+            userEle.innerHTML = `${user} has left the chat`
+            userEle.style.textAlign = 'center';
+            userEle.style.color = 'red'
+            messages.appendChild(userEle)
+        })
     </script>
 </body>
 

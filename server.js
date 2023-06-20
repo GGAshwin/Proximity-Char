@@ -115,8 +115,8 @@ io.on('connection', (socket) => {
       users.every(async (u) => {
         if (calculateDistance(latitude, longitude, u.latitude, u.longitude) <= proximityThreshold) {
           // join that users room then break
-          console.log('for the user: ', username);
-          console.log('with the user: ', u.username);
+          // console.log('for the user: ', username);
+          // console.log('with the user: ', u.username);
           flag = true
           socket.join(u.room)
           room = u.room
@@ -134,6 +134,7 @@ io.on('connection', (socket) => {
         })
         user.save()
         io.emit('room', room)
+        io.to(room).emit('new user', { name: username, roomId: room });
         // console.log('condition is true')
       }
       // if none of the users satisfy the condition then create a new room and save it into db
@@ -151,6 +152,9 @@ io.on('connection', (socket) => {
         })
         user.save()
         io.emit('room', room)
+        // io.emit('new user', { user: username, roomId: room })
+        io.to(room).emit('new user', { name: username, roomId: room });
+
         // console.log('condition is false')
       }
 
@@ -162,15 +166,12 @@ io.on('connection', (socket) => {
         longitude
       })
     }
-    finally {
-      // calculateDistance(latitude, longitude)
-      socket.join("room#1")
-    }
   })
 
   socket.on('new user', (user) => {
-    console.log('new user: ' + user.name)
-    // console.log(user);
+    console.log('got new user signal');
+    console.log('new user:')
+    console.log(user);
     // io.emit('new user', user);
     // since server is not receiving any roomId its not executing the below code
     io.to(user.room).emit('new user', user);
@@ -185,7 +186,7 @@ io.on('connection', (socket) => {
     const user = userMap.get(socket.id);
     if (user) {
       console.log(`User '${user.username}' disconnected from room: ${user.room}`);
-      // Perform additional actions with user data as needed
+      io.to(user.room).emit('user left',user.username)
     }
     const delUser = await User.deleteMany({ socketId: socket.id })
     delUser
