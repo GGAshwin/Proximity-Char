@@ -80,6 +80,7 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
   socket.on('location', async (location) => {
+    // console.log('location is called');
     console.log(location);
     const longitude = location.longitude;
     const latitude = location.latitude;
@@ -87,33 +88,58 @@ io.on('connection', (socket) => {
     try {
       let flag = false
       const users = await User.find({})
-      console.log(users);
-      users.forEach(async (u) => {
+      // console.log(users);
+
+      // users.forEach(async (u) => {
+      //   if (calculateDistance(latitude, longitude, u.latitude, u.longitude) <= proximityThreshold) {
+      //     // join that users room then break
+      //     flag = true
+      //     socket.join(u.room)
+      //     let room = u.room
+      //     userMap.set(socket.id, { room, username });
+      //     const socketId = socket.id
+      //     const user = await User.create({
+      //       username,
+      //       latitude,
+      //       longitude,
+      //       room,
+      //       socketId
+      //     })
+      //     user.save()
+      //     io.emit('room', room)
+      //     return
+      //   }
+      // })
+      const socketId = socket.id
+      let room = ''
+      users.every(async (u) => {
         if (calculateDistance(latitude, longitude, u.latitude, u.longitude) <= proximityThreshold) {
           // join that users room then break
+          console.log('for the user: ', username);
+          console.log('with the user: ', u.username);
           flag = true
           socket.join(u.room)
-          let room = u.room
-          userMap.set(socket.id, { room, username });
-          const socketId = socket.id
-          const user = await User.create({
-            username,
-            latitude,
-            longitude,
-            room,
-            socketId
-          })
-          user.save()
-          io.emit('room', room)
-          return
+          room = u.room
+          return false
         }
       })
-
+      if (flag) {
+        userMap.set(socket.id, { room, username });
+        const user = await User.create({
+          username,
+          latitude,
+          longitude,
+          room,
+          socketId
+        })
+        user.save()
+        io.emit('room', room)
+        // console.log('condition is true')
+      }
       // if none of the users satisfy the condition then create a new room and save it into db
       if (!flag) {
         const room = uniqid()
         socket.join(room)
-        console.log(room);
         userMap.set(socket.id, { room, username });
         const socketId = socket.id
         const user = await User.create({
@@ -125,6 +151,7 @@ io.on('connection', (socket) => {
         })
         user.save()
         io.emit('room', room)
+        // console.log('condition is false')
       }
 
     } catch (error) {
@@ -142,9 +169,11 @@ io.on('connection', (socket) => {
   })
 
   socket.on('new user', (user) => {
-    console.log('new user: ' + user)
+    console.log('new user: ' + user.name)
+    // console.log(user);
     // io.emit('new user', user);
-    io.to(msg.room).emit('new user', user);
+    // since server is not receiving any roomId its not executing the below code
+    io.to(user.room).emit('new user', user);
   })
 
   socket.on('chat message', (msg) => {
@@ -152,7 +181,7 @@ io.on('connection', (socket) => {
     // io.emit('chat message', msg);
     console.log(msg);
   });
-  socket.on('disconnect',async () => {
+  socket.on('disconnect', async () => {
     const user = userMap.get(socket.id);
     if (user) {
       console.log(`User '${user.username}' disconnected from room: ${user.room}`);
@@ -161,7 +190,7 @@ io.on('connection', (socket) => {
     const delUser = await User.deleteMany({ socketId: socket.id })
     delUser
     userMap.delete(socket.id);
-    console.log(userMap);
+    // console.log(userMap);
   })
 });
 
