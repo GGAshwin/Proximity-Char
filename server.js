@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express');
 const app = express();
 const http = require('http');
@@ -10,7 +11,7 @@ const userMap = new Map();
 const uniqid = require('uniqid')
 
 const { sin, cos, sqrt, atan2 } = Math;
-const proximityThreshold = 3
+const proximityThreshold = 30
 
 function radians(degrees) {
   return degrees * Math.PI / 180;
@@ -46,12 +47,26 @@ const distance = calculateDistance(lat1, lon1, lat2, lon2);
 
 
 const mongoose = require('mongoose');
+// Mongoose local connection
+// mongoose.set('strictQuery', false);
+// const connectionParams = {
+//   useNewUrlParser: true,
+//   useUnifiedTopology: true
+// }
+// mongoose.connect('mongodb://127.0.0.1:27017/proximity?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+1.6.0', connectionParams)
+//   .then(() => {
+//     console.log('Connected to the database ')
+//   })
+//   .catch((err) => {
+//     console.error(`Error connecting to the database. n${err}`);
+//   })
+
 mongoose.set('strictQuery', false);
 const connectionParams = {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }
-mongoose.connect('mongodb://127.0.0.1:27017/proximity?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+1.6.0', connectionParams)
+mongoose.connect(process.env.MONGO_URL, connectionParams)
   .then(() => {
     console.log('Connected to the database ')
   })
@@ -59,28 +74,13 @@ mongoose.connect('mongodb://127.0.0.1:27017/proximity?directConnection=true&serv
     console.error(`Error connecting to the database. n${err}`);
   })
 
-
 app.use(express.static((__dirname)))
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
 });
 
-// io.on('connection', (socket) => {
-//     console.log("User connected");
-//     socket.broadcast.emit('hi')
-
-//     socket.on('chat message', (msg) => {
-//       console.log('message: ' + msg);
-//       socket.broadcast.emit(msg)
-//     });
-//     socket.on('disconnect',()=>{
-//         console.log("User disconnected");
-//     })
-//   });
-
 io.on('connection', (socket) => {
   socket.on('location', async (location) => {
-    // console.log('location is called');
     console.log(location);
     const longitude = location.longitude;
     const latitude = location.latitude;
@@ -88,28 +88,6 @@ io.on('connection', (socket) => {
     try {
       let flag = false
       const users = await User.find({})
-      // console.log(users);
-
-      // users.forEach(async (u) => {
-      //   if (calculateDistance(latitude, longitude, u.latitude, u.longitude) <= proximityThreshold) {
-      //     // join that users room then break
-      //     flag = true
-      //     socket.join(u.room)
-      //     let room = u.room
-      //     userMap.set(socket.id, { room, username });
-      //     const socketId = socket.id
-      //     const user = await User.create({
-      //       username,
-      //       latitude,
-      //       longitude,
-      //       room,
-      //       socketId
-      //     })
-      //     user.save()
-      //     io.emit('room', room)
-      //     return
-      //   }
-      // })
       const socketId = socket.id
       let room = ''
       users.every(async (u) => {
@@ -135,7 +113,7 @@ io.on('connection', (socket) => {
         user.save()
         io.emit('room', room)
         io.to(room).emit('new user', { name: username, roomId: room });
-        // console.log('condition is true')
+        io.to(user.room).emit('count', userMap.size)
       }
       // if none of the users satisfy the condition then create a new room and save it into db
       if (!flag) {
@@ -152,10 +130,8 @@ io.on('connection', (socket) => {
         })
         user.save()
         io.emit('room', room)
-        // io.emit('new user', { user: username, roomId: room })
         io.to(room).emit('new user', { name: username, roomId: room });
-
-        // console.log('condition is false')
+        io.to(user.room).emit('count', userMap.size)
       }
 
     } catch (error) {
@@ -168,12 +144,15 @@ io.on('connection', (socket) => {
     }
   })
 
+  // This connection is not being used???
   socket.on('new user', (user) => {
     console.log('got new user signal');
     console.log('new user:')
     console.log(user);
     // io.emit('new user', user);
     // since server is not receiving any roomId its not executing the below code
+    io.to(user.room).emit('count', userMap.size)
+    console.log('hello');
     io.to(user.room).emit('new user', user);
   })
 
@@ -186,11 +165,12 @@ io.on('connection', (socket) => {
     const user = userMap.get(socket.id);
     if (user) {
       console.log(`User '${user.username}' disconnected from room: ${user.room}`);
-      io.to(user.room).emit('user left',user.username)
+      io.to(user.room).emit('user left', user.username)
+      const delUser = await User.deleteMany({ socketId: socket.id })
+      delUser
+      userMap.delete(socket.id);
+      io.to(user.room).emit('count', userMap.size)
     }
-    const delUser = await User.deleteMany({ socketId: socket.id })
-    delUser
-    userMap.delete(socket.id);
     // console.log(userMap);
   })
 });

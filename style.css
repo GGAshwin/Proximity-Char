@@ -52,3 +52,26 @@ body {
 #messages>li:nth-child(odd) {
     background: #efefef;
 }
+
+#count{
+    height: 50px;
+    width: 100px;
+    /* background-color: #333; */
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 29px 0px;
+    border-radius: 5px;
+    border: 1px solid;
+    font-family: sans-serif;
+    font-size: small;
+    gap: 3px;
+}
+
+#count_txt{
+    color: green;
+    font-weight: bold;
+}
